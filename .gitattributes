@@ -1,0 +1,47 @@
+# Auto normalize line endings
+* text=auto
+
+# Python
+*.py text eol=lf
+*.pyx text eol=lf
+*.pxd text eol=lf
+*.pxi text eol=lf
+
+# Shell
+*.sh text eol=lf
+*.bash text eol=lf
+
+# SQL
+*.sql text eol=lf
+
+# JSON
+*.json text eol=lf
+*.jsonc text eol=lf
+
+# YAML
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Markdown
+*.md text eol=lf
+README text eol=lf
+
+# Documentation
+*.txt text eol=lf
+*.rst text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.otf binary
+*.db binary
