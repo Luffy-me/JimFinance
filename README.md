@@ -292,6 +292,10 @@ pytest tests/
 - [Architecture Design](docs/ARCHITECTURE.md) - System architecture
 - [Database Schema](docs/DATABASE.md) - Database design
 - [Development Guide](docs/DEVELOPMENT.md) - Contributing guide
+- [Phase 2: Transaction Intelligence](docs/PHASE2_TRANSACTION_INTELLIGENCE.md) - Transaction engine documentation
+- [Phase 3: Telegram Bot](docs/PHASE3_TELEGRAM_BOT.md) - Telegram bot features and API
+- [Telegram Bot Setup](docs/TELEGRAM_BOT_SETUP.md) - Setup and deployment guide
+- [Phase 3 Roadmap](docs/PHASE3_ROADMAP.md) - Remaining work for Phase 3
 
 ## 🤝 Contributing
 
