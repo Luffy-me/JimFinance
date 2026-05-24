@@ -1,0 +1,97 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+pgdata/
+
+# Logs
+logs/
+*.log
+*.pot
+
+# Local files
+.local/
+.cache/
+tmp/
+temp/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Frontend (when added)
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Misc
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+*.bak
+*.tmp
