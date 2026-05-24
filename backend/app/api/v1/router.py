@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     dashboard,
     transaction_intelligence,
     telegram,
+    agents,
 )
 
 api_router = APIRouter()
@@ -28,3 +29,4 @@ api_router.include_router(subscriptions.router, prefix="/subscriptions", tags=["
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(transaction_intelligence.router, prefix="/intelligence", tags=["transaction_intelligence"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
+api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
