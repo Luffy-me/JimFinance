@@ -237,6 +237,80 @@ class DashboardResponse(BaseModel):
     financial_goals: List[FinancialGoalResponse]
 
 
+# Transaction Intelligence Schemas
+class ClassificationResult(BaseModel):
+    """AI classification result for a transaction."""
+    category: str
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    reasoning: str
+    is_recurring: bool = False
+    is_suspicious: bool = False
+
+
+class TransactionIntelligenceRequest(BaseModel):
+    """Request to process transaction via intelligence pipeline."""
+    text: Optional[str] = None
+    merchant: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = "USD"
+    description: Optional[str] = None
+    account_id: int
+
+
+class TransactionIntelligenceResponse(BaseModel):
+    """Response from transaction intelligence processing."""
+    user_id: int
+    account_id: int
+    merchant: str
+    amount: float
+    currency: str
+    description: str
+    transaction_date: datetime
+    transaction_type: str
+    category: str
+    confidence_score: float
+    is_recurring: bool
+    tags: List[str]
+    source_type: str
+    raw_input: Optional[str] = None
+    metadata: dict
+
+
+class OCRUploadRequest(BaseModel):
+    """Request to upload and process image for OCR."""
+    account_id: int
+    description: Optional[str] = None
+
+
+class OCRUploadResponse(BaseModel):
+    """Response from OCR processing."""
+    extracted_text: str
+    transaction: TransactionIntelligenceResponse
+
+
+class MerchantMatchResult(BaseModel):
+    """Result of merchant fuzzy matching."""
+    original: str
+    matched: Optional[str]
+    confidence: float
+
+
+class RecurringPatternResult(BaseModel):
+    """Result of recurring pattern detection."""
+    is_recurring: bool
+    pattern: str
+    average_interval: Optional[float]
+    occurrences: int
+    confidence: float
+
+
+class AnomalyDetectionResult(BaseModel):
+    """Result of anomaly detection."""
+    is_anomaly: bool
+    anomaly_score: float = Field(..., ge=0.0, le=1.0)
+    z_score: Optional[float] = None
+
+
 # Error Schemas
 class ErrorResponse(BaseModel):
     error: str
