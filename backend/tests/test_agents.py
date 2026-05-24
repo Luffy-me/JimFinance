@@ -184,19 +184,26 @@ class TestFinancialInsight:
         assert d["impact"] == "negative"
 
 
+class ConcreteAgent(BaseAgent):
+    """Concrete implementation of BaseAgent for testing."""
+    
+    async def analyze(self, financial_metrics, transaction_context, user_id):
+        """Mock analysis implementation."""
+        return {"test": "result"}
+
 class TestBaseAgent:
     """Test BaseAgent functionality."""
     
     def test_base_agent_initialization(self):
         """Test initializing base agent."""
-        agent = BaseAgent("TestAgent")
+        agent = ConcreteAgent("TestAgent")
         assert agent.name == "TestAgent"
         assert agent._call_count == 0
         assert agent._error_count == 0
     
     def test_validate_inputs(self):
         """Test input validation."""
-        agent = BaseAgent("TestAgent")
+        agent = ConcreteAgent("TestAgent")
         
         metrics = FinancialMetrics(
             total_income=5000,
@@ -222,7 +229,7 @@ class TestBaseAgent:
     
     def test_validate_inputs_negative_expenses(self):
         """Test validation fails for negative expenses."""
-        agent = BaseAgent("TestAgent")
+        agent = ConcreteAgent("TestAgent")
         
         metrics = FinancialMetrics(
             total_income=5000,
@@ -248,7 +255,7 @@ class TestBaseAgent:
     
     def test_log_call(self):
         """Test logging calls."""
-        agent = BaseAgent("TestAgent")
+        agent = ConcreteAgent("TestAgent")
         
         assert agent._call_count == 0
         assert agent._error_count == 0
@@ -263,7 +270,7 @@ class TestBaseAgent:
     
     def test_get_stats(self):
         """Test getting agent statistics."""
-        agent = BaseAgent("TestAgent")
+        agent = ConcreteAgent("TestAgent")
         
         agent.log_call(success=True)
         agent.log_call(success=True)
