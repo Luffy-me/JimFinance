@@ -135,7 +135,7 @@ async def setup_webhook(payload: WebhookSetupRequest) -> WebhookSetupResponse:
         logger.error(f"Failed to setup webhook: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to setup webhook: {str(e)}",
+            detail="Failed to setup webhook. Please check your configuration.",
         )
 
 
@@ -243,7 +243,7 @@ async def send_message(
         logger.error(f"Failed to send message: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to send message: {str(e)}",
+            detail="Failed to send message. Please check your parameters.",
         )
 
 
@@ -269,5 +269,5 @@ async def telegram_health() -> Dict[str, Any]:
         return {
             "status": "unhealthy",
             "service": "telegram_bot",
-            "error": str(e),
+            "error": "Health check failed",  # Don't expose exception details
         }
