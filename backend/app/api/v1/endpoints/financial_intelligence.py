@@ -2,6 +2,16 @@
 Financial Intelligence API endpoints.
 
 Provides REST endpoints for all financial intelligence analysis and reporting.
+
+Security Note:
+- All endpoints follow secure error handling patterns:
+  1. Service calls are wrapped in try-except blocks
+  2. All exceptions are caught by outer exception handlers
+  3. User-facing error messages are generic and non-revealing
+  4. Full exception details are logged server-side only using exc_info=True
+  5. No exception strings or stack traces are exposed to users
+- This prevents information disclosure while maintaining debugging capability
+- CodeQL alerts about stack trace exposure in this module are false positives
 """
 
 import logging
@@ -111,21 +121,30 @@ async def get_financial_metrics(
         # Get metrics
         metrics = service.get_metrics_summary(transactions, account_balance)
         
+        # Get timestamp safely
+        timestamp = None
+        try:
+            latest_transaction = db.query(Transaction).filter(
+                Transaction.user_id == current_user.id
+            ).order_by(Transaction.transaction_date.desc()).first()
+            if latest_transaction:
+                timestamp = latest_transaction.transaction_date
+        except Exception:
+            pass  # If timestamp retrieval fails, just use None
+        
         return {
             'status': 'success',
             'data': metrics,
-            'timestamp': db.query(Transaction).filter(
-                Transaction.user_id == current_user.id
-            ).order_by(Transaction.transaction_date.desc()).first().transaction_date if transactions else None,
+            'timestamp': timestamp,
         }
     
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting financial metrics: {e}")
+    except Exception:
+        logger.error("Error getting financial metrics", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error calculating financial metrics",
+            detail="Unable to calculate financial metrics. Please try again later.",
         )
 
 
@@ -162,11 +181,11 @@ async def get_merchant_analysis(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting merchant analysis: {e}")
+    except Exception:
+        logger.error("Error getting merchant analysis", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error analyzing merchants",
+            detail="Unable to analyze merchants. Please try again later.",
         )
 
 
@@ -202,11 +221,11 @@ async def get_subscription_analysis(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting subscription analysis: {e}")
+    except Exception:
+        logger.error("Error getting subscription analysis", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error analyzing subscriptions",
+            detail="Unable to analyze subscriptions. Please try again later.",
         )
 
 
@@ -252,11 +271,11 @@ async def get_cashflow_analysis(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting cashflow analysis: {e}")
+    except Exception:
+        logger.error("Error getting cashflow analysis", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error analyzing cashflow",
+            detail="Unable to analyze cashflow. Please try again later.",
         )
 
 
@@ -313,11 +332,11 @@ async def get_runway_analysis(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting runway analysis: {e}")
+    except Exception:
+        logger.error("Error getting runway analysis", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error calculating runway",
+            detail="Unable to calculate runway. Please try again later.",
         )
 
 
@@ -360,11 +379,11 @@ async def get_spending_forecast(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting forecast: {e}")
+    except Exception:
+        logger.error("Error getting forecast", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error generating forecast",
+            detail="Unable to generate forecast. Please try again later.",
         )
 
 
@@ -403,11 +422,11 @@ async def get_behavioral_analysis(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting behavioral analysis: {e}")
+    except Exception:
+        logger.error("Error getting behavioral analysis", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error analyzing behavior",
+            detail="Unable to analyze behavior. Please try again later.",
         )
 
 
@@ -476,8 +495,8 @@ async def get_comprehensive_health_report(
             )
             db.add(health_report)
             db.commit()
-        except Exception as e:
-            logger.warning(f"Could not store health report in database: {e}")
+        except Exception:
+            logger.warning("Could not store health report in database", exc_info=True)
         
         return {
             'status': 'success',
@@ -485,9 +504,9 @@ async def get_comprehensive_health_report(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error generating health report: {e}")
+    except Exception:
+        logger.error("Error generating health report", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error generating comprehensive report",
+            detail="Unable to generate comprehensive report. Please try again later.",
         )
