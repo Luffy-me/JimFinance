@@ -74,9 +74,20 @@ async def analyze_finances(
                 detail="Analysis failed - please try again later",
             )
         
+        # Save report to database
+        report = service.save_report_to_database(
+            user_id=current_user.id,
+            synthesis=synthesis,
+            db=db,
+        )
+        
+        response_data = synthesis.to_dict()
+        if report:
+            response_data["report_id"] = report.id
+        
         return {
             "success": True,
-            "data": synthesis.to_dict(),
+            "data": response_data,
         }
         
     except Exception as e:
@@ -238,3 +249,162 @@ async def get_agent_statistics(
         "success": True,
         "data": stats,
     }
+
+
+@router.get("/agents/reports")
+async def get_user_reports(
+    limit: int = 10,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get historical agent analysis reports for user.
+    
+    Args:
+        limit: Maximum number of reports (default: 10)
+        offset: Pagination offset (default: 0)
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        List of historical agent reports with pagination
+    """
+    from app.models.database import AgentReport
+    
+    if limit < 1 or limit > 100:
+        limit = 10
+    if offset < 0:
+        offset = 0
+    
+    try:
+        # Get total count
+        total = db.query(AgentReport).filter(
+            AgentReport.user_id == current_user.id
+        ).count()
+        
+        # Get reports
+        reports = db.query(AgentReport).filter(
+            AgentReport.user_id == current_user.id
+        ).order_by(
+            AgentReport.created_at.desc()
+        ).offset(offset).limit(limit).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "reports": [
+                    {
+                        "id": r.id,
+                        "report_type": r.report_type,
+                        "executive_summary": r.executive_summary,
+                        "priority_level": r.priority_level,
+                        "overall_confidence": r.overall_confidence,
+                        "period_start": r.period_start.isoformat(),
+                        "period_end": r.period_end.isoformat(),
+                        "created_at": r.created_at.isoformat(),
+                        "insights_count": len(r.insights),
+                        "risk_assessments_count": len(r.risk_assessments),
+                    }
+                    for r in reports
+                ],
+                "pagination": {
+                    "limit": limit,
+                    "offset": offset,
+                    "total": total,
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch reports: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch reports",
+        )
+
+
+@router.get("/agents/reports/{report_id}")
+async def get_report_details(
+    report_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed information for a specific report.
+    
+    Args:
+        report_id: Report ID
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Complete report with all insights and risk assessments
+    """
+    from app.models.database import AgentReport
+    
+    try:
+        report = db.query(AgentReport).filter(
+            AgentReport.id == report_id,
+            AgentReport.user_id == current_user.id,
+        ).first()
+        
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found",
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "id": report.id,
+                "report_type": report.report_type,
+                "executive_summary": report.executive_summary,
+                "priority_level": report.priority_level,
+                "overall_confidence": report.overall_confidence,
+                "period_start": report.period_start.isoformat(),
+                "period_end": report.period_end.isoformat(),
+                "created_at": report.created_at.isoformat(),
+                "is_reviewed": report.is_reviewed,
+                "strategist_perspective": report.strategist_perspective,
+                "critic_perspective": report.critic_perspective,
+                "key_insights": report.key_insights,
+                "action_items": report.action_items,
+                "insights": [
+                    {
+                        "id": i.id,
+                        "insight_type": i.insight_type,
+                        "title": i.title,
+                        "description": i.description,
+                        "impact": i.impact,
+                        "confidence": i.confidence,
+                        "action": i.action,
+                        "is_acknowledged": i.is_acknowledged,
+                    }
+                    for i in report.insights
+                ],
+                "risk_assessments": [
+                    {
+                        "id": r.id,
+                        "risk_level": r.risk_level,
+                        "risk_score": r.risk_score,
+                        "financial_health_score": r.financial_health_score,
+                        "title": r.title,
+                        "description": r.description,
+                        "vulnerabilities": r.vulnerabilities,
+                        "alerts": r.alerts,
+                        "recommendations": r.recommendations,
+                        "is_acknowledged": r.is_acknowledged,
+                    }
+                    for r in report.risk_assessments
+                ],
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch report details: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch report details",
+        )

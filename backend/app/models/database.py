@@ -78,6 +78,9 @@ class User(Base):
     financial_memory = relationship("FinancialMemory", back_populates="user", cascade="all, delete-orphan")
     forecasts = relationship("Forecast", back_populates="user", cascade="all, delete-orphan")
     goals = relationship("FinancialGoal", back_populates="user", cascade="all, delete-orphan")
+    agent_reports = relationship("AgentReport", back_populates="user", cascade="all, delete-orphan")
+    financial_insights = relationship("FinancialInsight", back_populates="user", cascade="all, delete-orphan")
+    risk_assessments = relationship("RiskAssessment", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -259,3 +262,123 @@ class FinancialGoal(Base):
 
     # Relationships
     user = relationship("User", back_populates="goals")
+
+
+class AgentReport(Base):
+    """Historical agent analysis reports (SynthesisOutput storage)."""
+    __tablename__ = "agent_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Report metadata
+    report_type = Column(String, default="full_analysis")  # full_analysis, strategy_only, risk_only
+    period_start = Column(DateTime(timezone=True), index=True)
+    period_end = Column(DateTime(timezone=True), index=True)
+    
+    # Synthesis output
+    executive_summary = Column(Text)
+    priority_level = Column(String)  # critical, high, medium, low
+    overall_confidence = Column(Float)
+    
+    # Agent perspectives stored as JSON
+    strategist_perspective = Column(JSON)  # StrategistOutput
+    critic_perspective = Column(JSON)  # CriticOutput
+    
+    # Key findings
+    key_insights = Column(JSON, default=[])  # List of FinancialInsight dicts
+    action_items = Column(JSON, default=[])  # List of action items
+    
+    # Analysis metrics
+    financial_metrics = Column(JSON, nullable=True)  # FinancialMetrics
+    transaction_count = Column(Integer, default=0)
+    
+    # Status and tracking
+    is_reviewed = Column(Boolean, default=False)
+    user_feedback = Column(JSON, nullable=True)  # User feedback on report
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="agent_reports")
+    insights = relationship("FinancialInsight", back_populates="report", cascade="all, delete-orphan")
+    risk_assessments = relationship("RiskAssessment", back_populates="report", cascade="all, delete-orphan")
+
+
+class FinancialInsight(Base):
+    """Individual financial insights extracted from agent analysis."""
+    __tablename__ = "financial_insights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    report_id = Column(Integer, ForeignKey("agent_reports.id"), nullable=True, index=True)
+    
+    # Insight classification
+    insight_type = Column(String, index=True)  # spending_pattern, budget_optimization, savings_opportunity, etc.
+    impact = Column(String)  # positive, negative, neutral
+    
+    # Content
+    title = Column(String, index=True)
+    description = Column(Text)
+    
+    # Quantitative data
+    metric_value = Column(DECIMAL(15, 2), nullable=True)
+    metric_unit = Column(String, nullable=True)  # USD, %, number, etc.
+    confidence = Column(Float, default=0.8)
+    
+    # Recommendations
+    action = Column(Text, nullable=True)
+    priority = Column(Integer, nullable=True)  # 1-5
+    
+    # Tracking
+    is_acknowledged = Column(Boolean, default=False)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="financial_insights")
+    report = relationship("AgentReport", back_populates="insights")
+
+
+class RiskAssessment(Base):
+    """Risk assessments from Critic Agent analysis."""
+    __tablename__ = "risk_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    report_id = Column(Integer, ForeignKey("agent_reports.id"), nullable=True, index=True)
+    
+    # Risk classification
+    risk_level = Column(String, index=True)  # low, medium, high, critical
+    risk_score = Column(Float)  # 0-100
+    
+    # Health metrics
+    financial_health_score = Column(Float)  # 0-100
+    
+    # Risk details
+    title = Column(String, index=True)
+    description = Column(Text)
+    
+    # Risk factors
+    vulnerabilities = Column(JSON, default=[])  # List of vulnerability dicts
+    alerts = Column(JSON, default=[])  # List of alert dicts
+    critical_issues = Column(JSON, default=[])  # List of critical issues
+    
+    # Recommendations
+    recommendations = Column(JSON, default=[])  # List of recommendation strings
+    confidence = Column(Float)
+    
+    # Response tracking
+    is_acknowledged = Column(Boolean, default=False)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    mitigation_actions = Column(JSON, nullable=True)  # User's mitigation actions
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="risk_assessments")
+    report = relationship("AgentReport", back_populates="risk_assessments")

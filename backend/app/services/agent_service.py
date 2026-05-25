@@ -14,6 +14,9 @@ from app.models.database import (
     Transaction,
     Account,
     Category,
+    AgentReport,
+    FinancialInsight as FinancialInsightModel,
+    RiskAssessment,
 )
 from app.ml.agents.types import (
     FinancialMetrics,
@@ -133,6 +136,98 @@ class AgentService:
             
         except Exception as e:
             self.logger.error(f"Financial analysis failed: {e}")
+            return None
+    
+    def save_report_to_database(
+        self,
+        user_id: int,
+        synthesis: SynthesisOutput,
+        db: Session,
+        strategist_output: Optional[StrategistOutput] = None,
+        critic_output: Optional[CriticOutput] = None,
+        financial_metrics: Optional[FinancialMetrics] = None,
+        report_type: str = "full_analysis",
+    ) -> Optional[AgentReport]:
+        """
+        Save agent analysis report to database.
+        
+        Args:
+            user_id: User ID
+            synthesis: Synthesis output from agents
+            db: Database session
+            strategist_output: Strategist agent output
+            critic_output: Critic agent output
+            financial_metrics: Financial metrics used
+            report_type: Type of report (full_analysis, strategy_only, risk_only)
+            
+        Returns:
+            Created AgentReport or None if save failed
+        """
+        try:
+            # Create agent report
+            report = AgentReport(
+                user_id=user_id,
+                report_type=report_type,
+                period_start=datetime.utcnow() - timedelta(days=30),
+                period_end=datetime.utcnow(),
+                executive_summary=synthesis.executive_summary,
+                priority_level=synthesis.priority_level,
+                overall_confidence=synthesis.overall_confidence,
+                strategist_perspective=strategist_output.to_dict() if strategist_output else synthesis.strategist_perspective,
+                critic_perspective=critic_output.to_dict() if critic_output else synthesis.critic_perspective,
+                key_insights=[insight.to_dict() if isinstance(insight, FinancialInsight) else insight 
+                             for insight in synthesis.key_insights],
+                action_items=synthesis.action_items,
+                financial_metrics=financial_metrics.to_dict() if financial_metrics else None,
+                transaction_count=financial_metrics.transaction_count if financial_metrics else 0,
+            )
+            
+            db.add(report)
+            db.commit()
+            db.refresh(report)
+            
+            # Save individual insights
+            for insight_data in synthesis.key_insights:
+                if isinstance(insight_data, dict):
+                    insight = FinancialInsightModel(
+                        user_id=user_id,
+                        report_id=report.id,
+                        insight_type=insight_data.get("type", "recommendation"),
+                        impact=insight_data.get("impact", "neutral"),
+                        title=insight_data.get("title", ""),
+                        description=insight_data.get("description", ""),
+                        confidence=insight_data.get("confidence", 0.8),
+                        action=insight_data.get("action"),
+                        metric_value=insight_data.get("metric_value"),
+                    )
+                    db.add(insight)
+            
+            # Save risk assessment if available
+            if critic_output:
+                risk_assessment = RiskAssessment(
+                    user_id=user_id,
+                    report_id=report.id,
+                    risk_level=critic_output.risk_level.value if hasattr(critic_output.risk_level, 'value') else critic_output.risk_level,
+                    risk_score=critic_output.risk_score,
+                    financial_health_score=critic_output.financial_health_score,
+                    title=f"Risk Assessment - {critic_output.risk_level}",
+                    description=f"Financial risk level: {critic_output.risk_level}",
+                    vulnerabilities=critic_output.vulnerabilities,
+                    alerts=critic_output.alerts,
+                    critical_issues=critic_output.critical_issues,
+                    recommendations=critic_output.recommendations,
+                    confidence=critic_output.confidence_score,
+                )
+                db.add(risk_assessment)
+            
+            db.commit()
+            
+            self.logger.info(f"✓ Report saved for user {user_id}: {report.id}")
+            return report
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save report: {e}")
+            db.rollback()
             return None
     
     def _get_financial_metrics(
