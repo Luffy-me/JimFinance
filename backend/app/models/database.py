@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, JSON, Numeric, DECIMAL, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from app.db.base import Base
 
@@ -196,25 +197,101 @@ class Subscription(Base):
 
 
 class FinancialMemory(Base):
-    """Persistent financial memory and behavioral insights."""
+    """Persistent financial memory and behavioral insights with vector embeddings."""
     __tablename__ = "financial_memory"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     
-    memory_type = Column(String, index=True)  # spending_pattern, behavior, insight, goal, etc.
-    title = Column(String)
+    # Memory classification
+    memory_type = Column(String, index=True)  # spending_pattern, emotional_spending, salary_cycle, 
+                                               # recurring_expense, subscription, behavioral_trigger, 
+                                               # seasonal_spending, financial_goal, user_priority, risk_tolerance
+    memory_category = Column(String, index=True)  # Fine-grained categorization
+    title = Column(String, index=True)
     description = Column(Text)
-    data = Column(JSON)
     
-    confidence_score = Column(Float, default=0.8)
-    is_validated = Column(Boolean, default=False)
+    # Core memory content
+    data = Column(JSON)  # Structured financial data
+    transaction_ids = Column(JSON, default=[])  # References to source transactions
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Vector embedding for semantic search
+    embedding = Column(Vector(1536), nullable=True)  # OpenAI embedding dimension (1536 for text-embedding-3-small)
+    embedding_model = Column(String, default="text-embedding-3-small")
+    
+    # Memory scoring and weighting
+    confidence_score = Column(Float, default=0.8)  # AI confidence in memory extraction
+    is_validated = Column(Boolean, default=False)  # User-validated memory
+    impact_score = Column(Float, default=0.5)  # Financial impact quantification (0-1)
+    relevance_score = Column(Float, default=0.5)  # Current relevance score
+    retrieval_count = Column(Integer, default=0)  # How many times retrieved (for popularity ranking)
+    
+    # Temporal tracking
+    memory_date = Column(DateTime(timezone=True), index=True)  # When this memory occurred
+    last_accessed_at = Column(DateTime(timezone=True), nullable=True)  # Last retrieval time
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
+    
+    # Behavioral context
+    contextual_data = Column(JSON, default={})  # Additional context: emotional_state, external_factors, etc.
+    behavioral_tags = Column(JSON, default=[])  # e.g., ["stress_spending", "seasonal", "impulsive"]
+    
     # Relationships
     user = relationship("User", back_populates="financial_memory")
+
+
+class MemoryInteraction(Base):
+    """Track memory retrieval patterns for ranking and insights."""
+    __tablename__ = "memory_interactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    memory_id = Column(Integer, ForeignKey("financial_memory.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Interaction metadata
+    context = Column(String)  # transaction_categorization, behavioral_analysis, anomaly_detection, etc.
+    retrieval_score = Column(Float)  # Score assigned during this retrieval
+    relevance_feedback = Column(Float, nullable=True)  # User feedback on relevance (-1, 0, 1)
+    
+    retrieved_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class BehavioralProfile(Base):
+    """Longitudinal behavioral profile with spending patterns and triggers."""
+    __tablename__ = "behavioral_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    
+    # Risk profile
+    risk_tolerance = Column(String)  # conservative, moderate, aggressive
+    risk_score = Column(Float, default=0.5)  # 0-1 scale
+    
+    # Behavioral characteristics
+    spending_triggers = Column(JSON, default=[])  # e.g., ["stress", "weekend", "after_paycheck"]
+    seasonal_patterns = Column(JSON, default={})  # Monthly spending variations
+    emotional_spending_tendency = Column(Float, default=0.5)  # 0-1 scale
+    
+    # Financial priorities (user-set)
+    priorities = Column(JSON, default=[])  # e.g., ["savings", "investments", "debt_reduction"]
+    priority_weights = Column(JSON, default={})  # Weighted priorities
+    
+    # Longitudinal metrics
+    avg_spending_per_month = Column(DECIMAL(15, 2), nullable=True)
+    spending_volatility = Column(Float, nullable=True)  # Standard deviation of spending
+    max_comfortable_transaction = Column(DECIMAL(15, 2), nullable=True)
+    
+    # Profile timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    profile_last_refined_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User")
 
 
 class Forecast(Base):
