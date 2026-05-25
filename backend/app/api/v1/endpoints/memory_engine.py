@@ -112,9 +112,11 @@ async def store_memory(
             "created_at": memory.created_at.isoformat(),
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error storing memory: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to store memory")
 
 
 @router.post("/search", response_model=List[MemoryResponse])
@@ -142,7 +144,7 @@ async def search_memories(
         
     except Exception as e:
         logger.error(f"Error searching memories: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to search memories")
 
 
 @router.get("/contextual", response_model=List[MemoryResponse])
@@ -174,7 +176,7 @@ async def get_contextual_memories(
         
     except Exception as e:
         logger.error(f"Error retrieving contextual memories: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve memories")
 
 
 @router.get("/behavioral-profile", response_model=dict)
@@ -206,7 +208,7 @@ async def get_behavioral_profile(
         
     except Exception as e:
         logger.error(f"Error retrieving behavioral profile: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve profile")
 
 
 @router.get("/insights", response_model=dict)
@@ -285,7 +287,7 @@ async def get_behavioral_insights(
         
     except Exception as e:
         logger.error(f"Error retrieving insights: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve insights")
 
 
 @router.post("/validate/{memory_id}", response_model=dict)
@@ -321,7 +323,7 @@ async def validate_memory(
         raise
     except Exception as e:
         logger.error(f"Error validating memory: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to validate memory")
 
 
 @router.get("/{memory_id}", response_model=dict)
@@ -360,4 +362,4 @@ async def get_memory(
         raise
     except Exception as e:
         logger.error(f"Error retrieving memory: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve memory")
