@@ -81,6 +81,10 @@ class User(Base):
     agent_reports = relationship("AgentReport", back_populates="user", cascade="all, delete-orphan")
     financial_insights = relationship("FinancialInsight", back_populates="user", cascade="all, delete-orphan")
     risk_assessments = relationship("RiskAssessment", back_populates="user", cascade="all, delete-orphan")
+    financial_health_reports = relationship("FinancialHealthReport", back_populates="user", cascade="all, delete-orphan")
+    merchant_profiles = relationship("MerchantProfile", back_populates="user", cascade="all, delete-orphan")
+    subscription_profiles = relationship("SubscriptionProfile", back_populates="user", cascade="all, delete-orphan")
+    forecast_records = relationship("ForecastRecord", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -382,3 +386,166 @@ class RiskAssessment(Base):
     # Relationships
     user = relationship("User", back_populates="risk_assessments")
     report = relationship("AgentReport", back_populates="risk_assessments")
+
+
+class FinancialHealthReport(Base):
+    """Periodic financial health snapshots from Phase 5 intelligence engine."""
+    __tablename__ = "financial_health_reports"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Report metadata
+    report_period_start = Column(DateTime(timezone=True), index=True)
+    report_period_end = Column(DateTime(timezone=True), index=True)
+    
+    # Financial metrics
+    savings_rate = Column(Float)  # %
+    burn_rate_monthly = Column(DECIMAL(15, 2))  # USD/month
+    cashflow_smoothness = Column(Float)  # 0-100
+    financial_health_score = Column(Float)  # 0-100
+    volatility_score = Column(Float)  # 0-100
+    
+    # Analysis data
+    metrics_json = Column(JSON)  # Full metrics dict from engine
+    merchant_analysis = Column(JSON)  # Top merchants
+    subscription_analysis = Column(JSON)  # Subscriptions found
+    cashflow_analysis = Column(JSON)  # Cashflow metrics
+    runway_analysis = Column(JSON)  # Runway projections
+    behavioral_insights = Column(JSON, default=[])  # Insights array
+    
+    # Confidence scoring
+    overall_confidence = Column(Float)
+    
+    # Status tracking
+    is_reviewed = Column(Boolean, default=False)
+    user_feedback = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="financial_health_reports")
+
+
+class MerchantProfile(Base):
+    """Merchant spending profiles and analysis."""
+    __tablename__ = "merchant_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Merchant identification
+    merchant_name = Column(String, index=True)
+    merchant_normalized = Column(String, index=True)  # Normalized name
+    category = Column(String)
+    
+    # Spending analysis
+    transaction_count = Column(Integer)
+    total_spent = Column(DECIMAL(15, 2))
+    average_transaction = Column(DECIMAL(15, 2))
+    min_transaction = Column(DECIMAL(15, 2))
+    max_transaction = Column(DECIMAL(15, 2))
+    
+    # Time analysis
+    first_transaction_date = Column(DateTime(timezone=True))
+    last_transaction_date = Column(DateTime(timezone=True))
+    frequency_days = Column(Float)  # Average days between visits
+    
+    # Price analysis
+    price_trend = Column(Float)  # % change
+    price_volatility = Column(Float)  # Std dev
+    
+    # Characteristics
+    is_likely_subscription = Column(Boolean, default=False)
+    is_loyalty_program = Column(Boolean, default=False)
+    merchant_risk_score = Column(Float)  # 0-100, lower is better
+    
+    # Confidence and metadata
+    confidence_score = Column(Float)
+    tags = Column(JSON, default=[])
+    
+    # Tracking
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="merchant_profiles")
+
+
+class SubscriptionProfile(Base):
+    """Detected subscription and recurring payment profiles."""
+    __tablename__ = "subscription_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Subscription identification
+    subscription_name = Column(String, index=True)
+    merchant = Column(String)
+    category = Column(String)
+    
+    # Financial data
+    amount = Column(DECIMAL(15, 2))
+    currency = Column(SQLEnum(Currency), default=Currency.USD)
+    billing_cycle = Column(String)  # daily, weekly, monthly, yearly, etc.
+    estimated_yearly_cost = Column(DECIMAL(15, 2))
+    
+    # Pattern analysis
+    first_occurrence = Column(DateTime(timezone=True))
+    last_occurrence = Column(DateTime(timezone=True))
+    occurrence_count = Column(Integer)
+    confidence_score = Column(Float)
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    churn_risk = Column(Float)  # 0-1, probability of cancellation
+    
+    # Trends and analysis
+    price_trend = Column(Float)  # % change
+    cost_effectiveness_score = Column(Float)  # 0-100
+    optimization_opportunities = Column(JSON, default=[])
+    tags = Column(JSON, default=[])
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="subscription_profiles")
+
+
+class ForecastRecord(Base):
+    """Historical forecast records for comparison and validation."""
+    __tablename__ = "forecast_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Forecast metadata
+    forecast_created_at = Column(DateTime(timezone=True), index=True)
+    forecast_category = Column(String)  # 'spending', 'income', 'category_specific'
+    forecast_for_category = Column(String, nullable=True)  # Specific category if applicable
+    
+    # Forecast data
+    forecast_periods = Column(JSON)  # Array of {period, value, lower, upper, confidence}
+    methodology = Column(String)  # 'exponential_smoothing', 'arima', etc.
+    
+    # Historical metrics
+    historical_months = Column(Integer)
+    average_historical = Column(DECIMAL(15, 2))
+    trend_direction = Column(String)  # 'increasing', 'decreasing', 'stable'
+    trend_percentage = Column(Float)
+    seasonality_strength = Column(Float)
+    
+    # Accuracy tracking
+    actual_values = Column(JSON, nullable=True)  # Actual values as they become available
+    forecast_accuracy = Column(Float, nullable=True)  # MAPE or similar metric
+    is_validated = Column(Boolean, default=False)
+    
+    # Status
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="forecast_records")
