@@ -86,6 +86,8 @@ class User(Base):
     merchant_profiles = relationship("MerchantProfile", back_populates="user", cascade="all, delete-orphan")
     subscription_profiles = relationship("SubscriptionProfile", back_populates="user", cascade="all, delete-orphan")
     forecast_records = relationship("ForecastRecord", back_populates="user", cascade="all, delete-orphan")
+    financial_decisions = relationship("FinancialDecision", back_populates="user", cascade="all, delete-orphan")
+    decision_analyses = relationship("DecisionAnalysis", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -626,3 +628,98 @@ class ForecastRecord(Base):
     
     # Relationships
     user = relationship("User", back_populates="forecast_records")
+
+
+# ==================== PHASE 4: FINANCIAL DECISIONS ====================
+
+
+class FinancialDecision(Base):
+    """User's financial decisions (e.g., purchase affordability analysis)."""
+    
+    __tablename__ = "financial_decisions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Decision metadata
+    decision_id = Column(String, unique=True, index=True)  # UUID
+    decision_name = Column(String)  # "iPhone Purchase"
+    description = Column(Text)
+    decision_type = Column(String)  # "lump_sum", "financed"
+    
+    # Financial parameters
+    purchase_price = Column(DECIMAL(15, 2))
+    monthly_payment = Column(DECIMAL(15, 2), nullable=True)
+    months_to_pay = Column(Integer, nullable=True)
+    
+    # Analysis metadata
+    analysis_date = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    days_of_data_used = Column(Integer)
+    
+    # Results storage
+    quantitative_analysis = Column(JSON)  # Full quantitative analysis result
+    scenario_analysis = Column(JSON)  # Conservative/balanced/aggressive scenarios
+    affordability_verdict = Column(String)  # "highly_recommended", "recommended", "neutral", etc.
+    confidence_score = Column(Float)  # 0-1
+    
+    # Agent debate (if available)
+    debate_record = Column(JSON, nullable=True)  # Full debate record
+    agent_positions = Column(JSON, nullable=True)  # Individual agent positions
+    
+    # User interaction
+    user_acknowledged = Column(Boolean, default=False)
+    user_notes = Column(Text, nullable=True)
+    decision_made = Column(Boolean, default=False)  # Did user proceed?
+    actual_purchase = Column(Boolean, nullable=True)  # Whether they actually bought
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="financial_decisions")
+    analyses = relationship("DecisionAnalysis", back_populates="decision", cascade="all, delete-orphan")
+
+
+class DecisionAnalysis(Base):
+    """Stored analysis results for a financial decision."""
+    
+    __tablename__ = "decision_analyses"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    decision_id = Column(Integer, ForeignKey("financial_decisions.id"), index=True)
+    
+    # Analysis type
+    analysis_type = Column(String)  # "quantitative", "affordability", "scenario", "debate"
+    
+    # Metrics
+    savings_rate = Column(Float, nullable=True)
+    burn_rate = Column(Float, nullable=True)
+    runway_months = Column(Float, nullable=True)
+    
+    # Affordability details
+    can_afford_lump_sum = Column(Boolean, nullable=True)
+    can_afford_financed = Column(Boolean, nullable=True)
+    balance_after_purchase = Column(DECIMAL(15, 2), nullable=True)
+    
+    # Scenario details
+    scenario_type = Column(String, nullable=True)  # "conservative", "balanced", "aggressive"
+    scenario_runway = Column(Float, nullable=True)
+    scenario_stress_level = Column(String, nullable=True)
+    
+    # Impact assessment
+    impact_on_runway = Column(Float, nullable=True)
+    impact_on_savings_rate = Column(Float, nullable=True)
+    
+    # Assumptions and reasoning
+    assumptions = Column(JSON)  # List of key assumptions
+    reasoning_chain = Column(JSON, nullable=True)  # Step-by-step reasoning
+    confidence = Column(Float)  # 0-1
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="decision_analyses")
+    decision = relationship("FinancialDecision", back_populates="analyses")
