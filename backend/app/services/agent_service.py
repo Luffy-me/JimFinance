@@ -29,6 +29,8 @@ from app.ml.agents.types import (
 from app.ml.agents.strategist import StrategistAgent
 from app.ml.agents.critic import CriticAgent
 from app.ml.agents.synthesizer import SynthesisEngine
+from app.ml.agents.orchestrator import DebateOrchestrator
+from app.ml.financial_reasoning.decision_analyzer import DecisionAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,8 @@ class AgentService:
         self.strategist = None
         self.critic = None
         self.synthesizer = SynthesisEngine()
+        self.orchestrator = DebateOrchestrator()
+        self.decision_analyzer = DecisionAnalyzer()
         self._initialize_agents()
     
     def _initialize_agents(self):
@@ -136,6 +140,152 @@ class AgentService:
             
         except Exception as e:
             self.logger.error(f"Financial analysis failed: {e}")
+            return None
+    
+    async def analyze_financial_decision(
+        self,
+        user_id: int,
+        decision_id: str,
+        decision_name: str,
+        decision_description: str,
+        purchase_price: float,
+        db: Session,
+        monthly_payment: Optional[float] = None,
+        months_to_pay: int = 1,
+        days: int = 30,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze a specific financial decision (affordability, scenarios, debate).
+        
+        Args:
+            user_id: User ID
+            decision_id: Unique decision identifier
+            decision_name: Name of decision (e.g., "iPhone Purchase")
+            decision_description: Description of the purchase
+            purchase_price: Price of the item
+            db: Database session
+            monthly_payment: Optional monthly payment for financing
+            months_to_pay: Financing period in months
+            days: Days of history to analyze (default: 30)
+            
+        Returns:
+            Decision analysis with debate record or None if analysis failed
+        """
+        try:
+            # Fetch user data
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                self.logger.error(f"User {user_id} not found")
+                return None
+            
+            # Get transactions
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            transactions = db.query(Transaction).filter(
+                (Transaction.user_id == user_id) &
+                (Transaction.transaction_date >= cutoff_date)
+            ).all()
+            
+            if not transactions:
+                self.logger.warning(f"No transactions found for user {user_id}")
+                return None
+            
+            # Collect financial data
+            financial_metrics = self._get_financial_metrics(user_id, db, days)
+            transaction_context = self._get_transaction_context(user_id, db, days)
+            
+            if not financial_metrics or not transaction_context:
+                self.logger.error(f"Failed to collect data for user {user_id}")
+                return None
+            
+            # Get user financial data for decision analyzer
+            accounts = db.query(Account).filter(
+                Account.user_id == user_id
+            ).all()
+            
+            total_balance = sum(
+                float(acc.current_balance or 0) for acc in accounts
+            )
+            
+            user_financial_data = {
+                "monthly_income": financial_metrics.total_income / (days / 30.0) if days > 0 else 0,
+                "monthly_expenses": financial_metrics.average_monthly_expense,
+                "current_balance": total_balance,
+                "recurring_expenses": financial_metrics.recurring_expenses,
+            }
+            
+            # Run quantitative decision analysis
+            self.logger.info(f"Running quantitative analysis for decision {decision_id}")
+            quantitative_analysis = self.decision_analyzer.analyze_decision(
+                decision_name=decision_name,
+                decision_description=decision_description,
+                purchase_price=purchase_price,
+                monthly_payment=monthly_payment,
+                months_to_pay=months_to_pay,
+                monthly_income=user_financial_data["monthly_income"],
+                monthly_expenses=user_financial_data["monthly_expenses"],
+                current_balance=total_balance,
+                recurring_expenses=user_financial_data["recurring_expenses"],
+                transactions=[{
+                    "date": t.transaction_date,
+                    "amount": float(t.amount),
+                    "category": t.category.name if t.category else "unknown",
+                } for t in transactions],
+            )
+            
+            # Run orchestrated debate (if agents available)
+            debate_record = None
+            if self.orchestrator.strategist or self.orchestrator.critic:
+                self.logger.info(f"Running debate orchestration for decision {decision_id}")
+                try:
+                    debate_record = await self.orchestrator.orchestrate_debate(
+                        decision_id=decision_id,
+                        user_id=user_id,
+                        decision_name=decision_name,
+                        decision_description=decision_description,
+                        purchase_price=purchase_price,
+                        monthly_payment=monthly_payment,
+                        months_to_pay=months_to_pay,
+                        financial_metrics=financial_metrics.to_dict(),
+                        transaction_context=transaction_context.to_dict(),
+                        transactions=[{
+                            "date": t.transaction_date,
+                            "amount": float(t.amount),
+                            "category": t.category.name if t.category else "unknown",
+                        } for t in transactions],
+                        user_financial_data=user_financial_data,
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Debate orchestration failed: {e}")
+            
+            # Combine results
+            result = {
+                "decision": {
+                    "id": decision_id,
+                    "name": decision_name,
+                    "description": decision_description,
+                    "type": "financed" if monthly_payment else "lump_sum",
+                    "price": purchase_price,
+                },
+                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "quantitative_analysis": quantitative_analysis,
+                "debate_record": (
+                    self.orchestrator.to_dict(debate_record)
+                    if debate_record
+                    else None
+                ),
+                "recommendation": (
+                    quantitative_analysis.get("recommendation", {}).get("level", "neutral")
+                ),
+                "confidence": (
+                    quantitative_analysis.get("recommendation", {}).get("confidence", 0.75)
+                ),
+            }
+            
+            self.logger.info(f"Decision analysis complete for {decision_id}")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Decision analysis failed: {e}")
             return None
     
     def save_report_to_database(

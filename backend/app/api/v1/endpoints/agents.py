@@ -408,3 +408,159 @@ async def get_report_details(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch report details",
         )
+
+
+@router.post("/agents/decide")
+async def analyze_financial_decision(
+    decision_name: str,
+    description: str,
+    purchase_price: float,
+    monthly_payment: Optional[float] = None,
+    months_to_pay: int = 1,
+    days: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    service: AgentService = Depends(get_agent_service),
+):
+    """
+    Analyze a specific financial decision with quantitative and AI reasoning.
+    
+    Provides:
+    - Quantitative affordability analysis
+    - Scenario analysis (conservative/balanced/aggressive)
+    - Multi-agent debate (if agents available)
+    - Final recommendation with confidence
+    
+    Example: Can I afford this iPhone for ₽120,000?
+    
+    Args:
+        decision_name: Name of the decision (e.g., "iPhone Purchase")
+        description: Detailed description
+        purchase_price: Price of the item
+        monthly_payment: Optional monthly payment for financed purchases
+        months_to_pay: Financing period in months
+        days: Days of financial history to analyze
+        current_user: Authenticated user
+        db: Database session
+        service: Agent service
+        
+    Returns:
+        Decision analysis with quantitative metrics, scenarios, and recommendation
+    """
+    if days < 1 or days > 365:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Days must be between 1 and 365",
+        )
+    
+    if purchase_price <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Purchase price must be positive",
+        )
+    
+    try:
+        import uuid
+        decision_id = str(uuid.uuid4())
+        
+        logger.info(f"Starting decision analysis for user {current_user.id}: {decision_name}")
+        
+        # Run analysis
+        analysis = await service.analyze_financial_decision(
+            user_id=current_user.id,
+            decision_id=decision_id,
+            decision_name=decision_name,
+            decision_description=description,
+            purchase_price=purchase_price,
+            db=db,
+            monthly_payment=monthly_payment,
+            months_to_pay=months_to_pay,
+            days=days,
+        )
+        
+        if not analysis:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Decision analysis failed",
+            )
+        
+        return {
+            "success": True,
+            "data": analysis,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Decision analysis error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Financial decision analysis failed",
+        )
+
+
+@router.post("/agents/scenarios")
+async def analyze_scenarios(
+    monthly_income: float,
+    monthly_expenses: float,
+    current_balance: float,
+    days_of_data: int = 30,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate three-tier scenario analysis for current financial position.
+    
+    Provides:
+    - Conservative scenario (worst case planning)
+    - Balanced scenario (most likely case)
+    - Aggressive scenario (best case upside)
+    
+    Args:
+        monthly_income: Monthly gross income
+        monthly_expenses: Monthly total expenses
+        current_balance: Current account balance
+        days_of_data: Days of financial data available
+        current_user: Authenticated user
+        
+    Returns:
+        Three scenarios with projections and recommendations
+    """
+    try:
+        from app.ml.financial_reasoning.scenario_analyzer import ScenarioAnalyzer
+        
+        analyzer = ScenarioAnalyzer()
+        scenarios = analyzer.generate_scenarios(
+            monthly_income=monthly_income,
+            monthly_expenses=monthly_expenses,
+            current_balance=current_balance,
+            burn_rate_trend=0.0,  # Can be enhanced with historical data
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "monthly_income": monthly_income,
+                "monthly_expenses": monthly_expenses,
+                "current_balance": current_balance,
+                "scenarios": [
+                    {
+                        "type": s.type.value,
+                        "probability": s.probability,
+                        "description": s.description,
+                        "runway_months": s.projected_runway_months,
+                        "stress_level": s.stress_level,
+                        "recommendation": s.recommendation,
+                        "monthly_savings_target": s.monthly_savings_target,
+                        "action_items": s.action_items,
+                    }
+                    for s in scenarios
+                ],
+            },
+        }
+        
+    except Exception as e:
+        logger.error(f"Scenario analysis error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Scenario analysis failed",
+        )
