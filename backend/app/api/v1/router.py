@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     agents,
     financial_intelligence,
     memory_engine,
+    automation,
 )
 
 api_router = APIRouter()
@@ -34,3 +35,4 @@ api_router.include_router(financial_intelligence.router, prefix="/intelligence",
 api_router.include_router(memory_engine.router, tags=["memory"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
+api_router.include_router(automation.router, tags=["automation"])

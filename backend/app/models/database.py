@@ -784,3 +784,253 @@ class ReasoningMemory(Base):
     
     # Relationships
     user = relationship("User", backref="reasoning_memories")
+
+
+# ============================================================================
+# NOTIFICATION MODELS
+# ============================================================================
+
+class Notification(Base):
+    """Notification records for users."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(String, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Notification details
+    title = Column(String)
+    message = Column(Text)
+    notification_type = Column(String, index=True)  # alert type
+    
+    # Delivery
+    channels = Column(JSON)  # ["telegram", "email", "in_app"]
+    status = Column(String, default="pending")  # pending, sent, delivered, failed
+    
+    # Content
+    data = Column(JSON)  # Alert-specific data
+    confidence = Column(Float)  # 0-1
+    
+    # Delivery tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    failed_reason = Column(String, nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="notifications")
+
+
+class UserNotificationPreference(Base):
+    """User notification preferences."""
+    __tablename__ = "user_notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    
+    # Settings
+    notifications_enabled = Column(Boolean, default=True)
+    min_confidence = Column(Float, default=0.5)
+    
+    # Alert types
+    alert_types = Column(JSON)  # Dict of alert_type: enabled
+    
+    # Channels
+    channels = Column(JSON)  # Dict of channel: enabled
+    
+    # Quiet hours
+    quiet_hours_enabled = Column(Boolean, default=False)
+    quiet_hours_start = Column(String, nullable=True)  # HH:MM format
+    quiet_hours_end = Column(String, nullable=True)
+    
+    # Digest settings
+    digest_frequency = Column(String, default="daily")  # immediate, daily, weekly
+    
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="notification_preferences", uselist=False)
+
+
+class FinancialAlert(Base):
+    """Financial alerts detected for users."""
+    __tablename__ = "financial_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Alert details
+    alert_type = Column(String, index=True)  # spending_spike, burn_rate_warning, etc.
+    severity = Column(String)  # info, warning, critical
+    title = Column(String)
+    message = Column(Text)
+    
+    # Alert data
+    data = Column(JSON)
+    confidence = Column(Float)
+    recommendation = Column(Text)
+    
+    # Status
+    is_active = Column(Boolean, default=True, index=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    acknowledged_by_user = Column(Boolean, default=False)
+    
+    # Relationships
+    user = relationship("User", backref="financial_alerts")
+
+
+# ============================================================================
+# REPORT MODELS
+# ============================================================================
+
+class FinancialReport(Base):
+    """Generated financial reports."""
+    __tablename__ = "financial_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(String, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Period
+    report_period = Column(String)  # "weekly", "monthly"
+    period_start = Column(DateTime(timezone=True), index=True)
+    period_end = Column(DateTime(timezone=True), index=True)
+    
+    # Report content
+    summary = Column(JSON)
+    key_metrics = Column(JSON)
+    spending_analysis = Column(JSON)
+    income_analysis = Column(JSON, nullable=True)
+    trend_analysis = Column(JSON)
+    health_analysis = Column(JSON)
+    recommendations = Column(JSON)
+    
+    # Charts and visualizations
+    charts = Column(JSON)
+    
+    # Metadata
+    confidence = Column(Float)
+    pdf_path = Column(String, nullable=True)  # Path to generated PDF
+    
+    # Delivery tracking
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    viewed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="financial_reports")
+
+
+class ReportDelivery(Base):
+    """Report delivery history."""
+    __tablename__ = "report_deliveries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("financial_reports.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Delivery details
+    channel = Column(String)  # "telegram", "email"
+    status = Column(String)  # "pending", "sent", "delivered", "failed"
+    
+    # Tracking
+    message_id = Column(String, nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    failed_reason = Column(String, nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    report = relationship("FinancialReport", backref="deliveries")
+    user = relationship("User", backref="report_deliveries")
+
+
+# ============================================================================
+# AUTOMATION RULES MODELS
+# ============================================================================
+
+class AutomationRule(Base):
+    """Automation rules for alerts and actions."""
+    __tablename__ = "automation_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Rule details
+    name = Column(String)
+    description = Column(Text, nullable=True)
+    
+    # Condition
+    condition_type = Column(String)  # "spending_spike", "low_balance", etc.
+    condition_value = Column(JSON)  # Threshold and parameters
+    
+    # Action
+    action_type = Column(String)  # "notify", "categorize", "archive"
+    action_value = Column(JSON)  # Action parameters
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    
+    # Tracking
+    last_triggered_at = Column(DateTime(timezone=True), nullable=True)
+    trigger_count = Column(Integer, default=0)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="automation_rules")
+
+
+class TelegramUserMapping(Base):
+    """Maps Telegram users to JimFinance users."""
+    __tablename__ = "telegram_user_mappings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    telegram_user_id = Column(Integer, unique=True, index=True)
+    telegram_username = Column(String, nullable=True, index=True)
+    
+    # Connection
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    
+    # Tracking
+    connected_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="telegram_mapping", uselist=False)
+
+
+# ============================================================================
+# NOTIFICATION DELIVERY HISTORY
+# ============================================================================
+
+class NotificationDeliveryLog(Base):
+    """Log of notification delivery attempts."""
+    __tablename__ = "notification_delivery_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, ForeignKey("notifications.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Delivery attempt
+    channel = Column(String)
+    status = Column(String)  # "sent", "failed", "retry"
+    
+    # Details
+    message_id = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    
+    # Tracking
+    attempt_number = Column(Integer, default=1)
+    attempted_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    notification = relationship("Notification", backref="delivery_logs")
+    user = relationship("User", backref="notification_delivery_logs")
