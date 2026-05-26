@@ -1034,3 +1034,694 @@ class NotificationDeliveryLog(Base):
     # Relationships
     notification = relationship("Notification", backref="delivery_logs")
     user = relationship("User", backref="notification_delivery_logs")
+
+
+# ============================================================================
+# PHASE 5: ADVANCED FINANCIAL MODULES
+# ============================================================================
+
+class InvestmentProfile(Base):
+    """User's investment profile and asset allocation preferences."""
+    __tablename__ = "investment_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, unique=True)
+    
+    # Risk tolerance (0-100)
+    risk_tolerance = Column(Integer, default=50)
+    behavioral_risk_score = Column(Float, default=0.5)  # From spending volatility
+    
+    # Time horizons
+    investment_horizon_years = Column(Integer, default=10)
+    emergency_fund_months = Column(Integer, default=3)
+    
+    # Goals
+    goals = Column(JSON, default={})  # {goal_name: target_amount}
+    constraints = Column(JSON, default={})  # Portfolio constraints
+    
+    # Asset allocation preferences
+    target_allocation = Column(JSON, nullable=True)  # {asset_class: percentage}
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="investment_profile")
+
+
+class AssetClassMetrics(Base):
+    """Historical performance metrics for asset classes."""
+    __tablename__ = "asset_class_metrics"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    asset_class = Column(String, index=True)  # equity, bonds, real_estate, commodities, etc.
+    
+    # Performance data
+    date = Column(DateTime(timezone=True), index=True)
+    annual_return = Column(Float)  # 0.07 = 7%
+    volatility = Column(Float)  # 0.15 = 15%
+    sharpe_ratio = Column(Float)
+    
+    # Correlation to other assets
+    correlations = Column(JSON)  # {asset_class: correlation}
+    
+    # Historical price
+    price = Column(DECIMAL(20, 8))
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AllocationRecommendation(Base):
+    """Recommended asset allocation for user."""
+    __tablename__ = "allocation_recommendations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Allocation
+    allocation = Column(JSON)  # {asset_class: percentage}
+    allocation_type = Column(String)  # "strategic", "tactical"
+    
+    # Metrics
+    expected_return = Column(Float)
+    expected_volatility = Column(Float)
+    sharpe_ratio = Column(Float)
+    confidence = Column(Float)
+    
+    # Reasoning
+    assumptions = Column(JSON)
+    recommendations = Column(JSON)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="allocation_recommendations")
+
+
+class RebalancingEvent(Base):
+    """Track rebalancing decisions and outcomes."""
+    __tablename__ = "rebalancing_events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Allocation drift
+    current_allocation = Column(JSON)
+    target_allocation = Column(JSON)
+    drift_percentage = Column(JSON)  # {asset_class: drift}
+    
+    # Rebalancing recommendation
+    recommended_trades = Column(JSON)
+    tax_implications = Column(JSON)
+    
+    # Status
+    status = Column(String, default="suggested")  # suggested, executed, skipped
+    
+    # Tracking
+    suggested_at = Column(DateTime(timezone=True), server_default=func.now())
+    executed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="rebalancing_events")
+
+
+class MacroIndicator(Base):
+    """Macroeconomic indicators time series."""
+    __tablename__ = "macro_indicators"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Indicator details
+    indicator_code = Column(String, index=True)  # GDP, CPI, UNEMPLOYMENT, etc.
+    country = Column(String, index=True)
+    
+    # Data
+    date = Column(DateTime(timezone=True), index=True)
+    value = Column(Float)
+    previous_value = Column(Float, nullable=True)
+    change_percentage = Column(Float, nullable=True)
+    
+    # Metadata
+    source = Column(String)  # FRED, ECB, etc.
+    unit = Column(String)  # percentage, basis points, etc.
+    
+    # Tracking
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RiskScenario(Base):
+    """Macroeconomic scenario definitions and stress tests."""
+    __tablename__ = "risk_scenarios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Scenario definition
+    scenario_type = Column(String)  # recession, stagflation, deflation, rate_shock
+    severity = Column(String)  # mild, moderate, severe
+    
+    # Macro assumptions
+    gdp_growth_change = Column(Float)  # percentage point change
+    inflation_change = Column(Float)
+    unemployment_change = Column(Float)
+    rate_change = Column(Float)  # basis points
+    
+    # Personal finance impact
+    income_impact = Column(Float)  # percentage change
+    expense_impact = Column(Float)
+    portfolio_impact = Column(Float)
+    investment_return_change = Column(Float)
+    
+    # Recommendations
+    recommendations = Column(JSON)
+    action_items = Column(JSON)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="risk_scenarios")
+
+
+class PortfolioExposure(Base):
+    """Macro factor exposures of user's portfolio."""
+    __tablename__ = "portfolio_exposures"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Macro factors
+    interest_rate_sensitivity = Column(Float)  # Beta to interest rates
+    equity_beta = Column(Float)
+    inflation_sensitivity = Column(Float)
+    currency_exposure = Column(JSON)  # {currency: percentage}
+    
+    # Risk metrics
+    value_at_risk = Column(Float)  # 95% VaR
+    conditional_var = Column(Float)  # Expected shortfall
+    
+    # Tracking
+    calculated_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="portfolio_exposures")
+
+
+class MacroAlert(Base):
+    """Risk alerts based on macro indicators."""
+    __tablename__ = "macro_alerts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Alert details
+    alert_type = Column(String)  # recession_warning, inflation_spike, rate_risk
+    risk_level = Column(String)  # low, medium, high, critical
+    
+    # Signal
+    trigger_indicator = Column(String)
+    trigger_value = Column(Float)
+    threshold = Column(Float)
+    
+    # Recommendation
+    recommended_action = Column(String)
+    urgency = Column(Integer)  # 1-10
+    
+    # Status
+    acknowledged = Column(Boolean, default=False)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="macro_alerts")
+
+
+class ExchangeRate(Base):
+    """FX exchange rate time series."""
+    __tablename__ = "exchange_rates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Currency pair
+    base_currency = Column(String, index=True)
+    quote_currency = Column(String, index=True)
+    
+    # Rate data
+    date = Column(DateTime(timezone=True), index=True)
+    rate = Column(DECIMAL(15, 6))
+    bid = Column(DECIMAL(15, 6))
+    ask = Column(DECIMAL(15, 6))
+    
+    # Volatility
+    daily_volatility = Column(Float)
+    
+    # Tracking
+    source = Column(String)  # market_data_provider
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CurrencyExposure(Base):
+    """User's currency exposure across assets."""
+    __tablename__ = "currency_exposures"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Exposure details
+    currency = Column(String, index=True)
+    asset_class = Column(String)
+    
+    # Amount exposure
+    amount = Column(DECIMAL(20, 2))
+    percentage_of_portfolio = Column(Float)
+    
+    # Risk
+    volatility = Column(Float)
+    hedge_ratio = Column(Float, default=0.0)  # Percentage hedged
+    
+    # Tracking
+    calculated_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="currency_exposures")
+
+
+class FXForecast(Base):
+    """Currency movement forecasts."""
+    __tablename__ = "fx_forecasts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Currency pair
+    base_currency = Column(String, index=True)
+    quote_currency = Column(String, index=True)
+    
+    # Forecast
+    forecast_date = Column(DateTime(timezone=True), index=True)
+    forecasted_rate = Column(DECIMAL(15, 6))
+    confidence = Column(Float)
+    
+    # Direction
+    direction = Column(String)  # up, down, neutral
+    probability_up = Column(Float)
+    
+    # Methodology
+    methodology = Column(String)  # technical, fundamental, composite
+    factors = Column(JSON)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class HedgingPosition(Base):
+    """Active FX hedges and risk management positions."""
+    __tablename__ = "hedging_positions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Hedge details
+    currency_pair = Column(String)
+    hedge_type = Column(String)  # forward, option, diversification
+    
+    # Position
+    notional_amount = Column(DECIMAL(20, 2))
+    cost = Column(DECIMAL(20, 2))
+    effectiveness = Column(Float)  # 0-1
+    
+    # Status
+    status = Column(String)  # active, closed, expired
+    start_date = Column(DateTime(timezone=True))
+    end_date = Column(DateTime(timezone=True), nullable=True)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="hedging_positions")
+
+
+class TuitionPlan(Base):
+    """User's education planning profile."""
+    __tablename__ = "tuition_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, unique=True)
+    
+    # Education details
+    education_level = Column(String)  # highschool, undergraduate, graduate
+    start_date = Column(DateTime(timezone=True))
+    end_date = Column(DateTime(timezone=True), nullable=True)
+    
+    # Costs
+    estimated_total_cost = Column(DECIMAL(20, 2))
+    annual_cost = Column(DECIMAL(20, 2))
+    
+    # Financing
+    target_savings = Column(DECIMAL(20, 2))
+    financial_aid = Column(DECIMAL(20, 2), default=0)
+    scholarships = Column(DECIMAL(20, 2), default=0)
+    
+    # Plan details
+    savings_strategy = Column(JSON)  # Investment recommendation
+    loan_strategy = Column(JSON)  # Loan details
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="tuition_plans")
+
+
+class EducationCost(Base):
+    """Education cost projections."""
+    __tablename__ = "education_costs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tuition_plan_id = Column(Integer, ForeignKey("tuition_plans.id"), index=True)
+    
+    # Cost breakdown
+    year = Column(Integer)
+    tuition = Column(DECIMAL(20, 2))
+    fees = Column(DECIMAL(20, 2))
+    books = Column(DECIMAL(20, 2))
+    living_expenses = Column(DECIMAL(20, 2))
+    other_costs = Column(DECIMAL(20, 2))
+    
+    # Inflation adjusted
+    nominal_total = Column(DECIMAL(20, 2))
+    real_total = Column(DECIMAL(20, 2))
+    
+    # Inflation assumption
+    inflation_rate = Column(Float)  # 0.03 = 3%
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    tuition_plan = relationship("TuitionPlan", backref="cost_projections")
+
+
+class LoanScenario(Base):
+    """Student loan scenario analysis."""
+    __tablename__ = "loan_scenarios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Loan details
+    principal = Column(DECIMAL(20, 2))
+    interest_rate = Column(Float)  # 0.05 = 5%
+    repayment_years = Column(Integer)
+    
+    # Scenario
+    scenario_type = Column(String)  # standard, income_driven, accelerated
+    
+    # Calculations
+    monthly_payment = Column(DECIMAL(20, 2))
+    total_interest = Column(DECIMAL(20, 2))
+    total_cost = Column(DECIMAL(20, 2))
+    
+    # Comparison
+    vs_scenario = Column(String, nullable=True)  # For comparison
+    interest_saved = Column(DECIMAL(20, 2), nullable=True)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="loan_scenarios")
+
+
+class SalaryProfile(Base):
+    """User's compensation history and profile."""
+    __tablename__ = "salary_profiles"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, unique=True)
+    
+    # Current compensation
+    base_salary = Column(DECIMAL(20, 2))
+    annual_bonus = Column(DECIMAL(20, 2), default=0)
+    stock_options = Column(DECIMAL(20, 2), default=0)
+    
+    # Benefits
+    benefits_value = Column(DECIMAL(20, 2), default=0)
+    retirement_match = Column(DECIMAL(20, 2), default=0)
+    
+    # Job details
+    job_title = Column(String)
+    company_size = Column(String)  # startup, small, medium, large, enterprise
+    industry = Column(String)
+    years_experience = Column(Integer)
+    
+    # Career
+    education_level = Column(String)
+    certifications = Column(JSON)  # List of certifications
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="salary_profiles")
+
+
+class MarketData(Base):
+    """Job market salary and compensation benchmarks."""
+    __tablename__ = "market_data"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Position details
+    job_title = Column(String, index=True)
+    industry = Column(String, index=True)
+    location = Column(String, index=True)
+    
+    # Salary data
+    p25_salary = Column(DECIMAL(20, 2))
+    median_salary = Column(DECIMAL(20, 2))
+    p75_salary = Column(DECIMAL(20, 2))
+    
+    # Additional comp
+    average_bonus = Column(Float)  # Percentage
+    average_equity = Column(Float)  # Percentage
+    
+    # Compensation package
+    total_comp_p50 = Column(DECIMAL(20, 2))
+    
+    # Tracking
+    data_year = Column(Integer)
+    source = Column(String)
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class NegotiationStrategy(Base):
+    """Recommended salary negotiation strategies."""
+    __tablename__ = "negotiation_strategies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Job target
+    target_job_title = Column(String)
+    target_company = Column(String, nullable=True)
+    
+    # Market analysis
+    market_median = Column(DECIMAL(20, 2))
+    user_percentile = Column(Float)  # 0-100
+    market_gap = Column(DECIMAL(20, 2))  # How much below market
+    
+    # Strategy
+    negotiation_points = Column(JSON)  # List of talking points
+    leverage = Column(JSON)  # Evidence and credentials
+    ask_range = Column(JSON)  # {low: amount, high: amount}
+    
+    # Risk assessment
+    success_probability = Column(Float)
+    risk_level = Column(String)  # low, medium, high
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="negotiation_strategies")
+
+
+class CareerProjection(Base):
+    """Long-term career and earnings projections."""
+    __tablename__ = "career_projections"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Projection
+    projection_years = Column(Integer)  # 10, 20, 30
+    career_path = Column(String)  # individual_contributor, manager, executive
+    
+    # Year-by-year
+    projections = Column(JSON)  # [{year: 1, salary: X, bonus: Y, equity: Z}]
+    
+    # Assumptions
+    annual_raise = Column(Float)  # 0.03 = 3%
+    promotion_frequency_years = Column(Integer)
+    promotion_salary_bump = Column(Float)
+    
+    # Alternatives
+    alternatives = Column(JSON)  # Compare different career paths
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="career_projections")
+
+
+class WealthForecast(Base):
+    """Long-term wealth projections (30-year horizon)."""
+    __tablename__ = "wealth_forecasts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Forecast parameters
+    projection_years = Column(Integer)
+    time_horizon = Column(String)  # short (1-3y), medium (3-10y), long (10+y)
+    
+    # Starting point
+    current_net_worth = Column(DECIMAL(20, 2))
+    current_cash_flow = Column(DECIMAL(20, 2))  # Monthly net
+    
+    # Year-by-year forecast
+    annual_projections = Column(JSON)  # [{year: N, net_worth: X, income: Y, expenses: Z}]
+    
+    # Metrics
+    expected_final_net_worth = Column(DECIMAL(20, 2))
+    cagr = Column(Float)  # Compound annual growth rate
+    confidence_interval_low = Column(DECIMAL(20, 2))
+    confidence_interval_high = Column(DECIMAL(20, 2))
+    
+    # Assumptions
+    assumptions = Column(JSON)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="wealth_forecasts")
+
+
+class Milestone(Base):
+    """Financial milestones with achievement probabilities."""
+    __tablename__ = "milestones"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Milestone details
+    milestone_name = Column(String)  # first_home, retirement, financial_independence
+    target_amount = Column(DECIMAL(20, 2))
+    target_date = Column(DateTime(timezone=True))
+    
+    # Progress
+    current_progress = Column(DECIMAL(20, 2))
+    progress_percentage = Column(Float)  # 0-1
+    
+    # Probability
+    achievement_probability = Column(Float)  # 0-1
+    confidence = Column(Float)
+    
+    # Scenarios
+    optimistic_date = Column(DateTime(timezone=True))
+    pessimistic_date = Column(DateTime(timezone=True))
+    
+    # Status
+    achieved = Column(Boolean, default=False)
+    achieved_date = Column(DateTime(timezone=True), nullable=True)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="milestones")
+
+
+class MonteCarloResult(Base):
+    """Monte Carlo simulation results for probabilistic forecasting."""
+    __tablename__ = "monte_carlo_results"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Simulation details
+    simulation_type = Column(String)  # wealth, retirement, goal_achievement
+    num_simulations = Column(Integer)
+    
+    # Results distribution
+    percentile_10 = Column(DECIMAL(20, 2))
+    percentile_25 = Column(DECIMAL(20, 2))
+    percentile_50 = Column(DECIMAL(20, 2))  # Median
+    percentile_75 = Column(DECIMAL(20, 2))
+    percentile_90 = Column(DECIMAL(20, 2))
+    
+    # Statistics
+    mean_outcome = Column(DECIMAL(20, 2))
+    std_dev = Column(DECIMAL(20, 2))
+    success_rate = Column(Float)  # 0-1
+    
+    # Paths
+    simulation_paths = Column(JSON)  # Subset of paths for visualization
+    
+    # Assumptions
+    assumptions = Column(JSON)
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="monte_carlo_results")
+
+
+class DecisionOpportunityCost(Base):
+    """Opportunity cost analysis for financial decisions."""
+    __tablename__ = "decision_opportunity_costs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Decision
+    decision_name = Column(String)
+    description = Column(Text)
+    
+    # Alternatives
+    alternatives = Column(JSON)  # [{name: X, cost: Y, opportunity_cost: Z}]
+    
+    # Analysis
+    selected_alternative = Column(String, nullable=True)
+    opportunity_cost = Column(DECIMAL(20, 2))  # Cost of next best alternative
+    
+    # TCO breakdown
+    direct_costs = Column(JSON)
+    indirect_costs = Column(JSON)
+    total_cost = Column(DECIMAL(20, 2))
+    
+    # Regret risk
+    regret_probability = Column(Float)
+    regret_magnitude = Column(DECIMAL(20, 2))  # Potential loss if wrong
+    
+    # Tracking
+    decision_date = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    outcome_date = Column(DateTime(timezone=True), nullable=True)
+    actual_outcome = Column(JSON, nullable=True)
+    
+    # Relationships
+    user = relationship("User", backref="opportunity_costs")

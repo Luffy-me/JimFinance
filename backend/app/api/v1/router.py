@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     financial_intelligence,
     memory_engine,
     automation,
+    advanced_modules,
 )
 
 api_router = APIRouter()
@@ -36,3 +37,4 @@ api_router.include_router(memory_engine.router, tags=["memory"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
 api_router.include_router(automation.router, tags=["automation"])
+api_router.include_router(advanced_modules.router, prefix="/advanced", tags=["advanced_modules"])
