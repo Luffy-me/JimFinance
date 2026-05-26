@@ -67,3 +67,13 @@ mypy==1.7.1
 
 # PDF Generation
 reportlab==4.0.9
+
+# Task Queue & Scheduling
+celery==5.3.4
+celery-beat==2.5.0
+APScheduler==3.10.4
+python-dateutil==2.8.2
+
+# Chart Generation
+matplotlib==3.8.2
+plotly==5.18.0
