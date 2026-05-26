@@ -723,3 +723,64 @@ class DecisionAnalysis(Base):
     # Relationships
     user = relationship("User", back_populates="decision_analyses")
     decision = relationship("FinancialDecision", back_populates="analyses")
+
+
+class ReasoningMemory(Base):
+    """
+    Stores debate records and reasoning chains for past financial decisions.
+    Enables learning from similar decisions and improving recommendations.
+    """
+    __tablename__ = "reasoning_memory"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    
+    # Decision context
+    decision_id = Column(String, index=True)
+    decision_name = Column(String)
+    decision_description = Column(Text)
+    decision_type = Column(String)  # "purchase", "investment", "spending_cut", etc.
+    
+    # Decision parameters
+    purchase_price = Column(DECIMAL(15, 2), nullable=True)
+    monthly_payment = Column(DECIMAL(15, 2), nullable=True)
+    months_to_pay = Column(Integer, nullable=True)
+    
+    # Financial context at time of decision
+    user_monthly_income = Column(DECIMAL(15, 2))
+    user_monthly_expenses = Column(DECIMAL(15, 2))
+    user_current_balance = Column(DECIMAL(15, 2))
+    user_recurring_expenses = Column(DECIMAL(15, 2))
+    
+    # Debate record
+    strategist_position = Column(JSON)  # Strategist's analysis and recommendation
+    critic_position = Column(JSON)  # Critic's analysis and recommendation
+    synthesis = Column(JSON)  # Final synthesized recommendation
+    
+    # Reasoning chains (for visualization)
+    strategist_reasoning_chain = Column(JSON)  # Step-by-step reasoning
+    critic_reasoning_chain = Column(JSON)  # Step-by-step reasoning
+    
+    # Quantitative analysis results
+    quantitative_analysis = Column(JSON)  # Savings rate, runway, affordability, etc.
+    scenario_analysis = Column(JSON)  # Conservative/balanced/aggressive scenarios
+    
+    # Final recommendation
+    final_recommendation = Column(String)  # "highly_recommended", "recommended", "neutral", "not_recommended", "strongly_not_recommended"
+    confidence_score = Column(Float)  # 0-1
+    
+    # Outcomes (for learning)
+    actual_outcome = Column(String, nullable=True)  # "purchased", "not_purchased", "regretted", "satisfied"
+    outcome_date = Column(DateTime(timezone=True), nullable=True)
+    outcome_notes = Column(Text, nullable=True)
+    
+    # Metadata
+    inflation_scenario = Column(String, default="moderate")  # low, moderate, high
+    country = Column(String, default="US")
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", backref="reasoning_memories")

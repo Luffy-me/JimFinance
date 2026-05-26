@@ -564,3 +564,368 @@ async def analyze_scenarios(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Scenario analysis failed",
         )
+
+
+@router.get("/agents/decision/{decision_id}/debate")
+async def get_decision_debate(
+    decision_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieve full debate record for a financial decision.
+    
+    Shows:
+    - Strategist's position and reasoning chain
+    - Critic's position and reasoning chain
+    - Synthesis and final recommendation
+    - Quantitative analysis summary
+    - Scenario comparisons
+    
+    Args:
+        decision_id: Unique decision identifier
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Complete debate record with reasoning chains
+    """
+    try:
+        from app.ml.reasoning_memory.memory_service import ReasoningMemoryService
+        
+        memory_service = ReasoningMemoryService()
+        memory = memory_service.get_debate_record(db, current_user.id, decision_id)
+        
+        if not memory:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Debate record not found",
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "decision_id": memory.decision_id,
+                "decision": {
+                    "name": memory.decision_name,
+                    "description": memory.decision_description,
+                    "type": memory.decision_type,
+                    "price": float(memory.purchase_price) if memory.purchase_price else None,
+                    "monthly_payment": float(memory.monthly_payment) if memory.monthly_payment else None,
+                },
+                "financial_context": {
+                    "monthly_income": float(memory.user_monthly_income),
+                    "monthly_expenses": float(memory.user_monthly_expenses),
+                    "current_balance": float(memory.user_current_balance),
+                    "recurring_expenses": float(memory.user_recurring_expenses),
+                },
+                "debate": {
+                    "strategist": {
+                        "position": memory.strategist_position,
+                        "reasoning_chain": memory.strategist_reasoning_chain,
+                    },
+                    "critic": {
+                        "position": memory.critic_position,
+                        "reasoning_chain": memory.critic_reasoning_chain,
+                    },
+                },
+                "synthesis": memory.synthesis,
+                "quantitative_analysis": memory.quantitative_analysis,
+                "scenario_analysis": memory.scenario_analysis,
+                "final_recommendation": memory.final_recommendation,
+                "confidence_score": memory.confidence_score,
+                "outcome": {
+                    "actual_outcome": memory.actual_outcome,
+                    "outcome_date": memory.outcome_date.isoformat() if memory.outcome_date else None,
+                    "outcome_notes": memory.outcome_notes,
+                },
+                "created_at": memory.created_at.isoformat(),
+            },
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving debate: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve debate record",
+        )
+
+
+@router.get("/agents/decision/{decision_id}/reasoning-chain")
+async def get_reasoning_chain(
+    decision_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieve detailed reasoning chain for a decision.
+    
+    Shows step-by-step thinking from both agents.
+    
+    Args:
+        decision_id: Unique decision identifier
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Detailed reasoning chain formatted for visualization
+    """
+    try:
+        from app.ml.reasoning_memory.memory_service import ReasoningMemoryService
+        
+        memory_service = ReasoningMemoryService()
+        memory = memory_service.get_debate_record(db, current_user.id, decision_id)
+        
+        if not memory:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Debate record not found",
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "decision_id": decision_id,
+                "decision_summary": {
+                    "name": memory.decision_name,
+                    "type": memory.decision_type,
+                },
+                "reasoning_chains": {
+                    "strategist": {
+                        "agent": "Strategist (Gemini Pro)",
+                        "focus": "Opportunity analysis, long-term utility, wealth optimization",
+                        "reasoning_steps": memory.strategist_reasoning_chain or [],
+                        "conclusion": memory.strategist_position.get("recommendation") if memory.strategist_position else None,
+                        "confidence": (
+                            memory.strategist_position.get("confidence_score")
+                            if memory.strategist_position else None
+                        ),
+                    },
+                    "critic": {
+                        "agent": "Critic (Groq)",
+                        "focus": "Downside analysis, risk assessment, financial stress",
+                        "reasoning_steps": memory.critic_reasoning_chain or [],
+                        "conclusion": memory.critic_position.get("recommendation") if memory.critic_position else None,
+                        "confidence": (
+                            memory.critic_position.get("confidence_score")
+                            if memory.critic_position else None
+                        ),
+                    },
+                },
+                "synthesis": {
+                    "combined_reasoning": (
+                        memory.synthesis.get("executive_summary")
+                        if memory.synthesis else None
+                    ),
+                    "key_tensions": (
+                        memory.synthesis.get("key_insights")
+                        if memory.synthesis else []
+                    ),
+                    "final_recommendation": memory.final_recommendation,
+                    "confidence": memory.confidence_score,
+                },
+            },
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving reasoning chain: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve reasoning chain",
+        )
+
+
+@router.get("/agents/debates/similar")
+async def find_similar_debates(
+    decision_type: str = "purchase",
+    limit: int = 5,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Find similar past debates for comparison and learning.
+    
+    Args:
+        decision_type: Type of decision to match (purchase, investment, etc.)
+        limit: Maximum number of results
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        List of similar past debates with outcomes
+    """
+    try:
+        from app.ml.reasoning_memory.memory_service import ReasoningMemoryService
+        
+        memory_service = ReasoningMemoryService()
+        similar = memory_service.find_similar_debates(
+            db=db,
+            user_id=current_user.id,
+            decision_type=decision_type,
+            limit=limit,
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "decision_type": decision_type,
+                "similar_debates": [
+                    {
+                        "decision_id": s.decision_id,
+                        "decision_name": s.decision_name,
+                        "decision_type": s.decision_type,
+                        "price": float(s.purchase_price) if s.purchase_price else None,
+                        "final_recommendation": s.final_recommendation,
+                        "confidence": s.confidence_score,
+                        "actual_outcome": s.actual_outcome,
+                        "created_at": s.created_at.isoformat(),
+                        "outcome_satisfaction": (
+                            "positive" if s.actual_outcome in ["purchased", "satisfied"]
+                            else "negative" if s.actual_outcome in ["not_purchased", "regretted"]
+                            else None
+                        ),
+                    }
+                    for s in similar
+                ],
+                "total_similar": len(similar),
+            },
+        }
+        
+    except Exception as e:
+        logger.error(f"Error finding similar debates: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to find similar debates",
+        )
+
+
+@router.post("/agents/decision/{decision_id}/outcome")
+async def record_decision_outcome(
+    decision_id: str,
+    outcome: str,
+    notes: str = "",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Record the actual outcome of a decision.
+    
+    Used for learning and improving recommendations over time.
+    
+    Args:
+        decision_id: Unique decision identifier
+        outcome: "purchased", "not_purchased", "regretted", "satisfied"
+        notes: Optional notes about the outcome
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Success confirmation
+    """
+    try:
+        from app.ml.reasoning_memory.memory_service import ReasoningMemoryService
+        
+        if outcome not in ["purchased", "not_purchased", "regretted", "satisfied"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid outcome. Must be one of: purchased, not_purchased, regretted, satisfied",
+            )
+        
+        memory_service = ReasoningMemoryService()
+        success = memory_service.record_outcome(
+            db=db,
+            user_id=current_user.id,
+            decision_id=decision_id,
+            outcome=outcome,
+            notes=notes,
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Decision not found",
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "decision_id": decision_id,
+                "outcome": outcome,
+                "message": "Outcome recorded successfully",
+            },
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recording outcome: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record outcome",
+        )
+
+
+@router.get("/agents/decision-statistics")
+async def get_decision_statistics(
+    days_back: int = 365,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get statistics on past decisions and their outcomes.
+    
+    Shows:
+    - Total decisions and outcomes
+    - Recommendation accuracy
+    - Decision types
+    - Average confidence scores
+    
+    Args:
+        days_back: Period to analyze (default: 1 year)
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Decision statistics and insights
+    """
+    try:
+        from app.ml.reasoning_memory.memory_service import ReasoningMemoryService
+        
+        memory_service = ReasoningMemoryService()
+        stats = memory_service.get_decision_statistics(
+            db=db,
+            user_id=current_user.id,
+            days_back=days_back,
+        )
+        
+        # Calculate recommendation accuracy by type
+        accuracy_by_type = {}
+        for rec_type in ["recommended", "not_recommended", "neutral"]:
+            accuracy = memory_service.get_recommendation_accuracy(
+                db=db,
+                user_id=current_user.id,
+                recommendation=rec_type,
+                days_back=days_back,
+            )
+            if accuracy.get("sample_size", 0) > 0:
+                accuracy_by_type[rec_type] = accuracy
+        
+        return {
+            "success": True,
+            "data": {
+                "period_days": days_back,
+                "statistics": stats,
+                "accuracy_by_recommendation": accuracy_by_type,
+            },
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting decision statistics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get statistics",
+        )
